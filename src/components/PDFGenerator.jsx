@@ -689,7 +689,7 @@ export default function PDFGenerator({ formData, onClose }) {
   }
 
   // Gmail OAuth configuration
-  const GMAIL_CLIENT_ID = import.meta.env.VITE_GMAIL_CLIENT_ID || ''
+  const GMAIL_CLIENT_ID = '77466324556-s2siqrgbdj9qt0hu45s9oqsa4n5650in.apps.googleusercontent.com'
   const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.send'
 
   const [gmailLoading, setGmailLoading] = useState(false)
@@ -906,13 +906,6 @@ export default function PDFGenerator({ formData, onClose }) {
                   </button>
                 )}
               </div>
-
-              {/* Note configuration Gmail */}
-              {!GMAIL_CLIENT_ID && (
-                <p className="mt-4 text-xs text-gray-500 text-center">
-                  Pour activer Gmail : ajouter VITE_GMAIL_CLIENT_ID dans .env
-                </p>
-              )}
 
               <button onClick={() => { setShowShareModal(false); setGmailError(null); }} className="w-full mt-6 px-4 py-2 text-cemedis-600 hover:text-cemedis-700 transition-colors">
                 Retour
