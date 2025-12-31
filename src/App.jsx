@@ -179,8 +179,9 @@ function App() {
       { id: 3, name: 'Intervention', shortName: 'Interv.' },
     ]
 
-    // Add traceability step only for Implantologie
-    if (formData.interventionType === 'Implantologie') {
+    // Add traceability step for Implantologie and Chirurgie Pré Implantaire
+    const needsTracabilite = ['Implantologie', 'Chirurgie Pré Implantaire'].includes(formData.interventionType)
+    if (needsTracabilite) {
       baseSteps.push({ id: 4, name: 'Traçabilité', shortName: 'Traça.' })
     }
 
@@ -260,7 +261,7 @@ function App() {
 
   // Render current step content
   const renderStepContent = () => {
-    const hasTracabilite = formData.interventionType === 'Implantologie'
+    const hasTracabilite = ['Implantologie', 'Chirurgie Pré Implantaire'].includes(formData.interventionType)
 
     if (currentStep === 1) {
       return (
