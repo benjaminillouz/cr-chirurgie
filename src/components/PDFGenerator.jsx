@@ -910,6 +910,18 @@ export default function PDFGenerator({ formData, onClose }) {
                   </div>
                 </button>
 
+                {/* Instructions OAuth */}
+                {gmailLoading && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                    <p className="font-medium mb-1">Si un avertissement Google apparaît :</p>
+                    <ol className="list-decimal list-inside space-y-1 text-amber-700">
+                      <li>Cliquez sur <strong>"Paramètres avancés"</strong></li>
+                      <li>Puis sur <strong>"Accéder à cemedis.app (non sécurisé)"</strong></li>
+                      <li>Autorisez l'envoi d'emails</li>
+                    </ol>
+                  </div>
+                )}
+
                 {/* Email classique - mailto */}
                 <button onClick={shareViaEmail} className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
