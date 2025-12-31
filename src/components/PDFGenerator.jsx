@@ -698,6 +698,11 @@ export default function PDFGenerator({ formData, onClose }) {
   const [gmailRecipient, setGmailRecipient] = useState('')
   const [showGmailForm, setShowGmailForm] = useState(false)
 
+  // Veasy integration
+  const [veasyLoading, setVeasyLoading] = useState(false)
+  const [veasyError, setVeasyError] = useState(null)
+  const [veasySuccess, setVeasySuccess] = useState(false)
+
   const shareViaGmail = async () => {
     if (!pdfBlob) return
 
@@ -819,6 +824,56 @@ export default function PDFGenerator({ formData, onClose }) {
       await navigator.share({ title: 'Compte Rendu Opératoire', files: [file] })
     } catch (e) {
       console.error('Share failed:', e)
+    }
+  }
+
+  // Save to Veasy
+  const saveToVeasy = async () => {
+    if (!pdfBlob) return
+
+    setVeasyLoading(true)
+    setVeasyError(null)
+    setVeasySuccess(false)
+
+    try {
+      // Convert PDF blob to base64
+      const arrayBuffer = await pdfBlob.arrayBuffer()
+      const base64Pdf = btoa(
+        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      )
+
+      // Prepare payload
+      const payload = {
+        patient: {
+          id: formData.patientId || `${Date.now()}`,
+          name: formData.patientName || '',
+          firstName: formData.patientSurname || '',
+          date: formData.interventionDate || new Date().toISOString().split('T')[0],
+          examiner: formData.praticien || ''
+        },
+        pdf_base64: base64Pdf
+      }
+
+      // Send to Veasy webhook
+      const response = await fetch('https://n8n.cemedis.app/webhook/26db458d-4967-47f0-8f7f-f4b71ef872f5', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`)
+      }
+
+      setVeasySuccess(true)
+      setTimeout(() => setVeasySuccess(false), 3000)
+    } catch (err) {
+      console.error('Veasy save error:', err)
+      setVeasyError(err.message || 'Erreur lors de l\'enregistrement')
+    } finally {
+      setVeasyLoading(false)
     }
   }
 
@@ -1000,6 +1055,34 @@ export default function PDFGenerator({ formData, onClose }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
                     <span className="hidden xs:inline sm:inline">Partager</span>
+                  </button>
+                </div>
+
+                {/* Veasy integration */}
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  {veasyError && (
+                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs text-center">
+                      {veasyError}
+                    </div>
+                  )}
+                  {veasySuccess && (
+                    <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-xs text-center">
+                      Enregistré dans Veasy avec succès !
+                    </div>
+                  )}
+                  <button
+                    onClick={saveToVeasy}
+                    disabled={veasyLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {veasyLoading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    )}
+                    <span className="font-medium">Enregistrer dans Veasy</span>
                   </button>
                 </div>
               </div>
