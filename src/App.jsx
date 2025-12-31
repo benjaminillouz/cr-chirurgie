@@ -194,9 +194,23 @@ function App() {
   const steps = getSteps()
   const totalSteps = steps.length
 
-  // Update form data
-  const updateFormData = useCallback((field, value) => {
+  // Update form data - supports both direct values and functional updates
+  const updateFormData = useCallback((field, valueOrUpdater) => {
     setFormData(prev => {
+      // Get current value for this field
+      let currentValue
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.')
+        currentValue = prev[parent]?.[child]
+      } else {
+        currentValue = prev[field]
+      }
+
+      // Support functional updates for arrays (to avoid stale closure issues)
+      const value = typeof valueOrUpdater === 'function'
+        ? valueOrUpdater(currentValue)
+        : valueOrUpdater
+
       if (field.includes('.')) {
         const [parent, child] = field.split('.')
         return {
