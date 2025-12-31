@@ -1,12 +1,32 @@
 import { useState, useEffect, useRef } from 'react'
 import { jsPDF } from 'jspdf'
 
+// FDI Tooth numbering system
+const TEETH = {
+  upperRight: [18, 17, 16, 15, 14, 13, 12, 11],
+  upperLeft: [21, 22, 23, 24, 25, 26, 27, 28],
+  lowerLeft: [31, 32, 33, 34, 35, 36, 37, 38],
+  lowerRight: [48, 47, 46, 45, 44, 43, 42, 41]
+}
+
 const INTERVENTION_LABELS = {
   'Implantologie': 'Implantologie',
   'Chirurgie Pré Implantaire': 'Chirurgie Pré Implantaire',
   'Avulsions': 'Avulsions',
   'Freinectomies': 'Freinectomies',
   'Mini Vis': 'Mini Vis'
+}
+
+// Colors
+const COLORS = {
+  primary: [0, 75, 99],        // cemedis-500
+  primaryLight: [230, 244, 248], // cemedis-50
+  secondary: [245, 158, 11],   // amber-500
+  success: [34, 197, 94],      // green-500
+  text: [60, 60, 60],
+  textLight: [120, 120, 120],
+  white: [255, 255, 255],
+  border: [200, 220, 230]
 }
 
 export default function PDFGenerator({ formData, onClose }) {
@@ -26,61 +46,224 @@ export default function PDFGenerator({ formData, onClose }) {
     })
   }
 
-  // Helper to add a line with label and value
-  const addLine = (pdf, label, value, margin, yPos, labelWidth = 50) => {
-    if (!value || (Array.isArray(value) && value.length === 0)) return yPos
+  // Draw section header with colored background
+  const drawSectionHeader = (pdf, title, margin, yPos, pageWidth) => {
+    pdf.setFillColor(...COLORS.primaryLight)
+    pdf.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 10, 2, 2, 'F')
+    pdf.setTextColor(...COLORS.primary)
+    pdf.setFontSize(11)
     pdf.setFont('helvetica', 'bold')
-    pdf.text(`${label}: `, margin, yPos)
-    pdf.setFont('helvetica', 'normal')
-    const displayValue = Array.isArray(value) ? value.join(', ') : String(value)
-    pdf.text(displayValue, margin + labelWidth, yPos)
-    return yPos + 6
+    pdf.text(title, margin + 4, yPos + 2)
+    return yPos + 12
   }
 
-  // Helper to check if we need a new page
+  // Draw a badge/pill
+  const drawBadge = (pdf, text, x, y, bgColor, textColor = COLORS.white) => {
+    const textWidth = pdf.getTextWidth(text)
+    const padding = 3
+    const height = 6
+    const width = textWidth + padding * 2
+
+    pdf.setFillColor(...bgColor)
+    pdf.roundedRect(x, y - 4, width, height, 1.5, 1.5, 'F')
+    pdf.setTextColor(...textColor)
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text(text, x + padding, y)
+
+    return width + 2
+  }
+
+  // Draw a field with label and value
+  const drawField = (pdf, label, value, margin, yPos, pageWidth) => {
+    if (!value || (Array.isArray(value) && value.length === 0)) return yPos
+
+    pdf.setTextColor(...COLORS.textLight)
+    pdf.setFontSize(9)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(label, margin, yPos)
+
+    pdf.setTextColor(...COLORS.text)
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'normal')
+    const displayValue = Array.isArray(value) ? value.join(', ') : String(value)
+    const splitText = pdf.splitTextToSize(displayValue, pageWidth - margin - 70)
+    pdf.text(splitText, margin + 55, yPos)
+
+    return yPos + Math.max(6, splitText.length * 5)
+  }
+
+  // Draw dental chart
+  const drawDentalChart = (pdf, selectedTeeth, margin, yPos, pageWidth) => {
+    if (!selectedTeeth || selectedTeeth.length === 0) return yPos
+
+    const chartWidth = pageWidth - 2 * margin
+    const toothSize = 9
+    const toothGap = 2
+    const centerX = pageWidth / 2
+
+    // Title
+    pdf.setTextColor(...COLORS.primary)
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('Schéma dentaire', margin, yPos)
+    yPos += 8
+
+    // Background
+    pdf.setFillColor(250, 252, 254)
+    pdf.setDrawColor(...COLORS.border)
+    pdf.roundedRect(margin, yPos - 2, chartWidth, 45, 3, 3, 'FD')
+
+    // Calculate starting positions
+    const rowWidth = 8 * toothSize + 7 * toothGap
+    const startX = centerX - rowWidth - 3
+
+    // Draw upper row (18-11 | 21-28)
+    let x = startX
+    const upperY = yPos + 8
+
+    // Upper right (18-11)
+    TEETH.upperRight.forEach((tooth) => {
+      const isSelected = selectedTeeth.includes(tooth.toString())
+      if (isSelected) {
+        pdf.setFillColor(...COLORS.primary)
+        pdf.setTextColor(...COLORS.white)
+      } else {
+        pdf.setFillColor(...COLORS.white)
+        pdf.setDrawColor(...COLORS.border)
+        pdf.setTextColor(...COLORS.textLight)
+      }
+      pdf.roundedRect(x, upperY, toothSize, toothSize, 1, 1, isSelected ? 'F' : 'FD')
+      pdf.setFontSize(6)
+      pdf.text(tooth.toString(), x + 1.5, upperY + 6)
+      x += toothSize + toothGap
+    })
+
+    // Separator line
+    pdf.setDrawColor(...COLORS.primary)
+    pdf.setLineWidth(0.5)
+    pdf.line(centerX, upperY, centerX, upperY + toothSize)
+
+    // Upper left (21-28)
+    x = centerX + 3
+    TEETH.upperLeft.forEach((tooth) => {
+      const isSelected = selectedTeeth.includes(tooth.toString())
+      if (isSelected) {
+        pdf.setFillColor(...COLORS.primary)
+        pdf.setTextColor(...COLORS.white)
+      } else {
+        pdf.setFillColor(...COLORS.white)
+        pdf.setDrawColor(...COLORS.border)
+        pdf.setTextColor(...COLORS.textLight)
+      }
+      pdf.roundedRect(x, upperY, toothSize, toothSize, 1, 1, isSelected ? 'F' : 'FD')
+      pdf.setFontSize(6)
+      pdf.text(tooth.toString(), x + 1.5, upperY + 6)
+      x += toothSize + toothGap
+    })
+
+    // Horizontal separator
+    const lowerY = upperY + toothSize + 6
+    pdf.setDrawColor(...COLORS.border)
+    pdf.setLineWidth(0.3)
+    pdf.line(margin + 10, upperY + toothSize + 3, pageWidth - margin - 10, upperY + toothSize + 3)
+
+    // Lower row (48-41 | 31-38)
+    x = startX
+
+    // Lower right (48-41)
+    TEETH.lowerRight.forEach((tooth) => {
+      const isSelected = selectedTeeth.includes(tooth.toString())
+      if (isSelected) {
+        pdf.setFillColor(...COLORS.primary)
+        pdf.setTextColor(...COLORS.white)
+      } else {
+        pdf.setFillColor(...COLORS.white)
+        pdf.setDrawColor(...COLORS.border)
+        pdf.setTextColor(...COLORS.textLight)
+      }
+      pdf.roundedRect(x, lowerY, toothSize, toothSize, 1, 1, isSelected ? 'F' : 'FD')
+      pdf.setFontSize(6)
+      pdf.text(tooth.toString(), x + 1.5, lowerY + 6)
+      x += toothSize + toothGap
+    })
+
+    // Separator line
+    pdf.setDrawColor(...COLORS.primary)
+    pdf.setLineWidth(0.5)
+    pdf.line(centerX, lowerY, centerX, lowerY + toothSize)
+
+    // Lower left (31-38)
+    x = centerX + 3
+    TEETH.lowerLeft.forEach((tooth) => {
+      const isSelected = selectedTeeth.includes(tooth.toString())
+      if (isSelected) {
+        pdf.setFillColor(...COLORS.primary)
+        pdf.setTextColor(...COLORS.white)
+      } else {
+        pdf.setFillColor(...COLORS.white)
+        pdf.setDrawColor(...COLORS.border)
+        pdf.setTextColor(...COLORS.textLight)
+      }
+      pdf.roundedRect(x, lowerY, toothSize, toothSize, 1, 1, isSelected ? 'F' : 'FD')
+      pdf.setFontSize(6)
+      pdf.text(tooth.toString(), x + 1.5, lowerY + 6)
+      x += toothSize + toothGap
+    })
+
+    // Legend
+    yPos = lowerY + toothSize + 8
+    pdf.setFontSize(8)
+    pdf.setTextColor(...COLORS.textLight)
+    pdf.text(`${selectedTeeth.length} dent(s) sélectionnée(s): ${selectedTeeth.sort((a, b) => a - b).join(', ')}`, margin + 4, yPos)
+
+    return yPos + 8
+  }
+
+  // Check if we need a new page
   const checkNewPage = (pdf, yPos, margin, pageHeight, needed = 20) => {
     if (yPos + needed > pageHeight - margin) {
       pdf.addPage()
-      return margin
+      return margin + 5
     }
     return yPos
   }
 
-  // Helper to add images section
-  const addImagesSection = (pdf, images, title, margin, yPos, pageWidth, pageHeight) => {
+  // Add images section
+  const addImagesSection = (pdf, images, title, icon, margin, yPos, pageWidth, pageHeight) => {
     if (!images || images.length === 0) return yPos
 
     yPos = checkNewPage(pdf, yPos, margin, pageHeight, 80)
+    yPos = drawSectionHeader(pdf, `${title} (${images.length})`, margin, yPos, pageWidth)
 
-    pdf.setTextColor(0, 75, 99)
-    pdf.setFontSize(11)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text(title, margin, yPos)
-    yPos += 8
-
-    const imgWidth = 80
-    const imgHeight = 60
+    const imgWidth = 75
+    const imgHeight = 55
     let xPos = margin
     let imagesInRow = 0
 
     for (const img of images) {
       if (!img.preview) continue
 
-      yPos = checkNewPage(pdf, yPos, margin, pageHeight, imgHeight + 10)
-      if (yPos === margin) {
+      yPos = checkNewPage(pdf, yPos, margin, pageHeight, imgHeight + 15)
+      if (yPos === margin + 5) {
         xPos = margin
         imagesInRow = 0
       }
 
       try {
+        // Image border
+        pdf.setDrawColor(...COLORS.border)
+        pdf.setLineWidth(0.5)
+        pdf.roundedRect(xPos - 1, yPos - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S')
+
         pdf.addImage(img.preview, 'JPEG', xPos, yPos, imgWidth, imgHeight)
 
-        // Add image name below
-        pdf.setTextColor(100, 100, 100)
-        pdf.setFontSize(8)
+        // Image name below
+        pdf.setTextColor(...COLORS.textLight)
+        pdf.setFontSize(7)
         pdf.setFont('helvetica', 'normal')
         const imgName = img.name || `Image ${imagesInRow + 1}`
-        pdf.text(imgName.substring(0, 20), xPos, yPos + imgHeight + 4)
+        pdf.text(imgName.substring(0, 25), xPos, yPos + imgHeight + 5)
 
         imagesInRow++
         if (imagesInRow === 2) {
@@ -88,14 +271,13 @@ export default function PDFGenerator({ formData, onClose }) {
           yPos += imgHeight + 12
           imagesInRow = 0
         } else {
-          xPos += imgWidth + 10
+          xPos += imgWidth + 15
         }
       } catch (e) {
         console.error('Error adding image:', e)
       }
     }
 
-    // If we ended with one image in the row, move to next row
     if (imagesInRow === 1) {
       yPos += imgHeight + 12
     }
@@ -111,209 +293,292 @@ export default function PDFGenerator({ formData, onClose }) {
       const margin = 15
       let yPos = margin
 
-      // Header
-      pdf.setFillColor(0, 75, 99)
-      pdf.rect(0, 0, pageWidth, 35, 'F')
+      // ===== HEADER =====
+      pdf.setFillColor(...COLORS.primary)
+      pdf.rect(0, 0, pageWidth, 40, 'F')
 
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(18)
+      // Logo area placeholder
+      pdf.setFillColor(255, 255, 255, 0.1)
+      pdf.circle(25, 20, 12, 'F')
+      pdf.setTextColor(...COLORS.white)
+      pdf.setFontSize(8)
+      pdf.text('CEMEDIS', 18, 22)
+
+      // Title
+      pdf.setTextColor(...COLORS.white)
+      pdf.setFontSize(20)
       pdf.setFont('helvetica', 'bold')
-      pdf.text('COMPTE RENDU OPÉRATOIRE', pageWidth / 2, 15, { align: 'center' })
+      pdf.text('COMPTE RENDU OPÉRATOIRE', pageWidth / 2, 18, { align: 'center' })
 
+      // Date and time badge
       pdf.setFontSize(10)
       pdf.setFont('helvetica', 'normal')
-      pdf.text(`Date: ${formatDate(formData.interventionDate)} - ${formData.interventionTime || ''}`, pageWidth / 2, 25, { align: 'center' })
+      const dateText = `${formatDate(formData.interventionDate)} à ${formData.interventionTime || '--:--'}`
+      pdf.text(dateText, pageWidth / 2, 30, { align: 'center' })
 
-      yPos = 45
+      // Intervention type badge
+      const typeLabel = INTERVENTION_LABELS[formData.interventionType] || formData.interventionType
+      if (typeLabel) {
+        pdf.setFillColor(...COLORS.secondary)
+        const badgeWidth = pdf.getTextWidth(typeLabel) + 10
+        pdf.roundedRect((pageWidth - badgeWidth) / 2, 33, badgeWidth, 7, 2, 2, 'F')
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(typeLabel, pageWidth / 2, 38, { align: 'center' })
+      }
 
-      // Patient info section
-      pdf.setTextColor(0, 75, 99)
-      pdf.setFontSize(12)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('INFORMATIONS PATIENT', margin, yPos)
-      yPos += 8
+      yPos = 50
 
-      pdf.setTextColor(60, 60, 60)
+      // ===== PATIENT INFO =====
+      yPos = drawSectionHeader(pdf, 'INFORMATIONS PATIENT', margin, yPos, pageWidth)
+
+      // Patient info in a nice box
+      pdf.setFillColor(...COLORS.white)
+      pdf.setDrawColor(...COLORS.border)
+      pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 28, 3, 3, 'FD')
+
+      const col1X = margin + 5
+      const col2X = pageWidth / 2 + 5
+
+      pdf.setTextColor(...COLORS.text)
       pdf.setFontSize(10)
 
-      yPos = addLine(pdf, 'Nom', formData.patientName, margin, yPos, 35)
-      yPos = addLine(pdf, 'Prénom', formData.patientSurname, margin, yPos, 35)
-      yPos = addLine(pdf, 'Établissement', formData.centre, margin, yPos, 35)
-      yPos = addLine(pdf, 'Praticien', formData.praticien, margin, yPos, 35)
+      // Row 1
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Patient:', col1X, yPos + 8)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(`${formData.patientName || ''} ${formData.patientSurname || ''}`.trim() || '-', col1X + 20, yPos + 8)
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Praticien:', col2X, yPos + 8)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(formData.praticien || '-', col2X + 25, yPos + 8)
+
+      // Row 2
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Centre:', col1X, yPos + 18)
+      pdf.setFont('helvetica', 'normal')
+      const centreText = formData.centre || '-'
+      const truncatedCentre = centreText.length > 40 ? centreText.substring(0, 40) + '...' : centreText
+      pdf.text(truncatedCentre, col1X + 20, yPos + 18)
+
+      yPos += 35
+
+      // ===== PRÉ-OPÉRATOIRE =====
+      yPos = drawSectionHeader(pdf, 'PRÉ-OPÉRATOIRE', margin, yPos, pageWidth)
+
+      // Pre-op badges
+      let badgeX = margin
+      if (formData.premedication?.length > 0) {
+        formData.premedication.forEach(med => {
+          badgeX += drawBadge(pdf, med, badgeX, yPos + 3, COLORS.primary) + 2
+        })
+      }
+      if (formData.anesthesie?.length > 0) {
+        formData.anesthesie.forEach(anesth => {
+          badgeX += drawBadge(pdf, anesth, badgeX, yPos + 3, [59, 130, 246]) + 2 // blue
+        })
+      }
+      if (formData.nombreCarpules) {
+        badgeX += drawBadge(pdf, `${formData.nombreCarpules} carpules`, badgeX, yPos + 3, COLORS.success) + 2
+      }
+
+      yPos += badgeX > margin ? 12 : 2
+
+      if (formData.antisepsieLocale?.length > 0) {
+        pdf.setTextColor(...COLORS.textLight)
+        pdf.setFontSize(9)
+        pdf.text('Antisepsie:', margin, yPos)
+        pdf.setTextColor(...COLORS.text)
+        pdf.text(formData.antisepsieLocale.join(', '), margin + 25, yPos)
+        yPos += 6
+      }
 
       yPos += 5
 
-      // Intervention section
-      pdf.setTextColor(0, 75, 99)
-      pdf.setFontSize(12)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('INTERVENTION', margin, yPos)
-      yPos += 8
+      // ===== INTERVENTION DETAILS =====
+      yPos = checkNewPage(pdf, yPos, margin, pageHeight, 60)
+      yPos = drawSectionHeader(pdf, 'DÉTAILS INTERVENTION', margin, yPos, pageWidth)
 
-      pdf.setTextColor(60, 60, 60)
-      pdf.setFontSize(10)
-
-      const typeLabel = INTERVENTION_LABELS[formData.interventionType] || formData.interventionType || '-'
-      yPos = addLine(pdf, 'Type', typeLabel, margin, yPos, 35)
-
-      // Intervention-specific details
       const interventionType = formData.interventionType
+
+      // Get selected teeth based on intervention type
+      let selectedTeeth = []
+      if (interventionType === 'Implantologie' && formData.implanto?.dentsImplants) {
+        selectedTeeth = formData.implanto.dentsImplants
+      } else if (interventionType === 'Chirurgie Pré Implantaire' && formData.chirurgiePreImplantaire?.dentsExtraites) {
+        selectedTeeth = formData.chirurgiePreImplantaire.dentsExtraites
+      } else if (interventionType === 'Avulsions' && formData.avulsions?.dents) {
+        selectedTeeth = formData.avulsions.dents
+      } else if (interventionType === 'Mini Vis' && formData.miniVis?.dents) {
+        selectedTeeth = formData.miniVis.dents
+      }
+
+      // Draw dental chart if teeth are selected
+      if (selectedTeeth.length > 0) {
+        yPos = drawDentalChart(pdf, selectedTeeth, margin, yPos, pageWidth)
+        yPos += 5
+      }
+
+      // Intervention-specific fields
+      yPos = checkNewPage(pdf, yPos, margin, pageHeight, 40)
 
       if (interventionType === 'Implantologie' && formData.implanto) {
         const imp = formData.implanto
-        yPos = addLine(pdf, 'Indication', imp.indication, margin, yPos, 50)
-        yPos = addLine(pdf, 'Dents/Implants', imp.dentsImplants, margin, yPos, 50)
-        yPos = addLine(pdf, 'Incision', imp.incision, margin, yPos, 50)
-        yPos = addLine(pdf, 'Décharge', imp.incisionDecharge, margin, yPos, 50)
-        yPos = addLine(pdf, 'Séquence forage', imp.sequenceForage, margin, yPos, 50)
-        yPos = addLine(pdf, 'Séquence ostéotome', imp.sequenceOsteotome, margin, yPos, 50)
-        yPos = addLine(pdf, 'Hauteur os résiduel', imp.hauteurOsResiduel, margin, yPos, 50)
-        yPos = addLine(pdf, 'Pose clé', imp.poseCle, margin, yPos, 50)
-        yPos = addLine(pdf, 'Vis', imp.vis, margin, yPos, 50)
-        yPos = addLine(pdf, 'Sutures', imp.sutures, margin, yPos, 50)
-        yPos = addLine(pdf, 'Fil', imp.fil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Type fil', imp.typeFil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Hémostase', imp.hemostase, margin, yPos, 50)
+        yPos = drawField(pdf, 'Indication', imp.indication, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Incision', imp.incision, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Décharge', imp.incisionDecharge, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Séq. forage', imp.sequenceForage, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Ostéotome', imp.sequenceOsteotome, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Hauteur os', imp.hauteurOsResiduel, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Pose clé', imp.poseCle, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Vis', imp.vis, margin, yPos, pageWidth)
+
+        // Sutures in a grouped box
+        if (imp.sutures || imp.fil || imp.typeFil) {
+          yPos = checkNewPage(pdf, yPos, margin, pageHeight, 20)
+          pdf.setFillColor(252, 252, 253)
+          pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 12, 2, 2, 'F')
+          pdf.setTextColor(...COLORS.textLight)
+          pdf.setFontSize(8)
+          pdf.text('Sutures:', margin + 3, yPos + 5)
+          let sutureText = [imp.sutures, imp.fil, imp.typeFil].filter(Boolean).join(' • ')
+          pdf.setTextColor(...COLORS.text)
+          pdf.text(sutureText, margin + 22, yPos + 5)
+          yPos += 15
+        }
+
+        yPos = drawField(pdf, 'Hémostase', imp.hemostase, margin, yPos, pageWidth)
       }
 
       if (interventionType === 'Chirurgie Pré Implantaire' && formData.chirurgiePreImplantaire) {
         const chir = formData.chirurgiePreImplantaire
-        yPos = addLine(pdf, 'Indication', chir.indication, margin, yPos, 50)
-        yPos = addLine(pdf, 'Incision', chir.incision, margin, yPos, 50)
-        yPos = addLine(pdf, 'Décharge', chir.incisionDecharge, margin, yPos, 50)
-        if (chir.avulsionSeparation) yPos = addLine(pdf, 'Avulsion/Séparation', 'Oui', margin, yPos, 50)
-        yPos = addLine(pdf, 'Dents extraites', chir.dentsExtraites, margin, yPos, 50)
-        if (chir.revisionPlaie) yPos = addLine(pdf, 'Révision plaie', 'Oui', margin, yPos, 50)
-        if (chir.nettoyageCHX) yPos = addLine(pdf, 'Nettoyage CHX', 'Oui', margin, yPos, 50)
-        yPos = addLine(pdf, 'Biomatériaux', chir.biomateriaux, margin, yPos, 50)
-        yPos = addLine(pdf, 'Sutures', chir.sutures, margin, yPos, 50)
-        yPos = addLine(pdf, 'Fil', chir.fil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Type fil', chir.typeFil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Hémostase', chir.hemostase, margin, yPos, 50)
+        yPos = drawField(pdf, 'Indication', chir.indication, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Incision', chir.incision, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Décharge', chir.incisionDecharge, margin, yPos, pageWidth)
+        if (chir.avulsionSeparation) yPos = drawField(pdf, 'Avulsion/Sép.', 'Oui', margin, yPos, pageWidth)
+        if (chir.revisionPlaie) yPos = drawField(pdf, 'Révision plaie', 'Oui', margin, yPos, pageWidth)
+        if (chir.nettoyageCHX) yPos = drawField(pdf, 'Nettoyage CHX', 'Oui', margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Biomatériaux', chir.biomateriaux, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Sutures', [chir.sutures, chir.fil, chir.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Hémostase', chir.hemostase, margin, yPos, pageWidth)
       }
 
       if (interventionType === 'Avulsions' && formData.avulsions) {
         const avul = formData.avulsions
-        yPos = addLine(pdf, 'Indication', avul.indication, margin, yPos, 50)
-        yPos = addLine(pdf, 'Dents', avul.dents, margin, yPos, 50)
-        yPos = addLine(pdf, 'Lambeau', avul.lambeau, margin, yPos, 50)
-        yPos = addLine(pdf, 'Type incision', avul.typeIncision, margin, yPos, 50)
-        yPos = addLine(pdf, 'Décharge', avul.incisionDecharge, margin, yPos, 50)
-        yPos = addLine(pdf, 'Alvéolectomie', avul.alveolectomie, margin, yPos, 50)
-        yPos = addLine(pdf, 'Localisation', avul.localisation, margin, yPos, 50)
-        yPos = addLine(pdf, 'Séparation racines', avul.separationRacines, margin, yPos, 50)
-        if (avul.revisionPlaie) yPos = addLine(pdf, 'Révision plaie', 'Oui', margin, yPos, 50)
-        if (avul.rincageCHX) yPos = addLine(pdf, 'Rinçage CHX', 'Oui', margin, yPos, 50)
-        yPos = addLine(pdf, 'Sutures', avul.sutures, margin, yPos, 50)
-        yPos = addLine(pdf, 'Fil', avul.fil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Type fil', avul.typeFil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Hémostase', avul.hemostase, margin, yPos, 50)
+        yPos = drawField(pdf, 'Indication', avul.indication, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Lambeau', avul.lambeau, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Type incision', avul.typeIncision, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Décharge', avul.incisionDecharge, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Alvéolectomie', avul.alveolectomie, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Localisation', avul.localisation, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Séparation rac.', avul.separationRacines, margin, yPos, pageWidth)
+        if (avul.revisionPlaie) yPos = drawField(pdf, 'Révision plaie', 'Oui', margin, yPos, pageWidth)
+        if (avul.rincageCHX) yPos = drawField(pdf, 'Rinçage CHX', 'Oui', margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Sutures', [avul.sutures, avul.fil, avul.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Hémostase', avul.hemostase, margin, yPos, pageWidth)
       }
 
       if (interventionType === 'Mini Vis' && formData.miniVis) {
         const mv = formData.miniVis
-        yPos = addLine(pdf, 'Indication', mv.indication, margin, yPos, 50)
-        yPos = addLine(pdf, 'Pré-forage', mv.preForage, margin, yPos, 50)
-        yPos = addLine(pdf, 'Dents', mv.dents, margin, yPos, 50)
-        yPos = addLine(pdf, 'Pose mini vis', mv.poseMiniVis, margin, yPos, 50)
-        yPos = addLine(pdf, 'Localisation', mv.localisation, margin, yPos, 50)
-        if (mv.rdvControle) yPos = addLine(pdf, 'RDV contrôle', 'Oui', margin, yPos, 50)
+        yPos = drawField(pdf, 'Indication', mv.indication, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Pré-forage', mv.preForage, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Pose mini vis', mv.poseMiniVis, margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Localisation', mv.localisation, margin, yPos, pageWidth)
+        if (mv.rdvControle) yPos = drawField(pdf, 'RDV contrôle', 'Prévu', margin, yPos, pageWidth)
       }
 
       if (interventionType === 'Freinectomies' && formData.freinectomies) {
         const fr = formData.freinectomies
-        yPos = addLine(pdf, 'Type', fr.type, margin, yPos, 50)
-        if (fr.incision) yPos = addLine(pdf, 'Incision', 'Oui', margin, yPos, 50)
-        if (fr.desinsertionFibres) yPos = addLine(pdf, 'Désinsertion fibres', 'Oui', margin, yPos, 50)
-        if (fr.suturesCheck) yPos = addLine(pdf, 'Sutures', 'Oui', margin, yPos, 50)
-        yPos = addLine(pdf, 'Type sutures', fr.sutures, margin, yPos, 50)
-        yPos = addLine(pdf, 'Fil', fr.fil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Type fil', fr.typeFil, margin, yPos, 50)
-        yPos = addLine(pdf, 'Hémostase', fr.hemostase, margin, yPos, 50)
+        yPos = drawField(pdf, 'Type', fr.type, margin, yPos, pageWidth)
+        if (fr.incision) yPos = drawField(pdf, 'Incision', 'Oui', margin, yPos, pageWidth)
+        if (fr.desinsertionFibres) yPos = drawField(pdf, 'Désinsertion', 'Oui', margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Sutures', [fr.sutures, fr.fil, fr.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
+        yPos = drawField(pdf, 'Hémostase', fr.hemostase, margin, yPos, pageWidth)
       }
 
-      yPos += 5
-      yPos = checkNewPage(pdf, yPos, margin, pageHeight, 40)
-
-      // Pre-operative section
-      pdf.setTextColor(0, 75, 99)
-      pdf.setFontSize(12)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('PRÉ-OPÉRATOIRE', margin, yPos)
-      yPos += 8
-
-      pdf.setTextColor(60, 60, 60)
-      pdf.setFontSize(10)
-
-      yPos = addLine(pdf, 'Prémédication', formData.premedication, margin, yPos, 45)
-      yPos = addLine(pdf, 'Anesthésie', formData.anesthesie, margin, yPos, 45)
-      yPos = addLine(pdf, 'Nb carpules', formData.nombreCarpules, margin, yPos, 45)
-      yPos = addLine(pdf, 'Rappels anesthésiques', formData.rappelsAnesthesiques, margin, yPos, 45)
-      yPos = addLine(pdf, 'Antisepsie locale', formData.antisepsieLocale, margin, yPos, 45)
-
-      // Observations
+      // ===== OBSERVATIONS =====
       if (formData.observations) {
         yPos += 5
-        yPos = checkNewPage(pdf, yPos, margin, pageHeight, 30)
+        yPos = checkNewPage(pdf, yPos, margin, pageHeight, 35)
+        yPos = drawSectionHeader(pdf, 'OBSERVATIONS', margin, yPos, pageWidth)
 
-        pdf.setTextColor(0, 75, 99)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('OBSERVATIONS', margin, yPos)
-        yPos += 8
+        pdf.setFillColor(...COLORS.white)
+        pdf.setDrawColor(...COLORS.border)
+        const obsLines = pdf.splitTextToSize(formData.observations, pageWidth - 2 * margin - 10)
+        const obsHeight = Math.max(15, obsLines.length * 5 + 6)
+        pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, obsHeight, 3, 3, 'FD')
 
-        pdf.setTextColor(60, 60, 60)
+        pdf.setTextColor(...COLORS.text)
         pdf.setFontSize(10)
         pdf.setFont('helvetica', 'normal')
-
-        const splitText = pdf.splitTextToSize(formData.observations, pageWidth - 2 * margin)
-        pdf.text(splitText, margin, yPos)
-        yPos += splitText.length * 5
+        pdf.text(obsLines, margin + 5, yPos + 6)
+        yPos += obsHeight + 5
       }
 
-      // Post-operative
-      yPos += 5
+      // ===== SUIVI POST-OP =====
+      yPos += 3
       yPos = checkNewPage(pdf, yPos, margin, pageHeight, 25)
+      yPos = drawSectionHeader(pdf, 'SUIVI POST-OPÉRATOIRE', margin, yPos, pageWidth)
 
-      pdf.setTextColor(0, 75, 99)
-      pdf.setFontSize(12)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('SUIVI POST-OPÉRATOIRE', margin, yPos)
-      yPos += 8
+      // Post-op info in a highlighted box
+      pdf.setFillColor(254, 252, 232) // yellow-50
+      pdf.setDrawColor(250, 204, 21) // yellow-400
+      pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 18, 3, 3, 'FD')
 
-      pdf.setTextColor(60, 60, 60)
+      pdf.setTextColor(...COLORS.text)
       pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Fiche conseils:', margin + 5, yPos + 7)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(formData.ficheConseilsRemise || 'Non renseigné', margin + 40, yPos + 7)
 
-      yPos = addLine(pdf, 'Fiche conseils remise', formData.ficheConseilsRemise, margin, yPos, 50)
-      yPos = addLine(pdf, 'RDV contrôle J+', formData.rdvControleJour, margin, yPos, 50)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('RDV contrôle:', margin + 5, yPos + 14)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(formData.rdvControleJour ? `J+${formData.rdvControleJour}` : 'Non renseigné', margin + 40, yPos + 14)
 
-      // Traçabilité images (separate section)
+      yPos += 25
+
+      // ===== TRAÇABILITÉ =====
       const tracabiliteImages = (formData.tracabilitePhotos || []).filter(img => img.preview)
       if (tracabiliteImages.length > 0) {
-        yPos += 10
-        yPos = addImagesSection(pdf, tracabiliteImages, 'TRAÇABILITÉ', margin, yPos, pageWidth, pageHeight)
+        yPos = addImagesSection(pdf, tracabiliteImages, 'TRAÇABILITÉ', '📋', margin, yPos, pageWidth, pageHeight)
       }
 
-      // Radiographies images (separate section)
+      // ===== RADIOGRAPHIES =====
       const radiographiesImages = (formData.radiographies || []).filter(img => img.preview)
       if (radiographiesImages.length > 0) {
-        yPos += 10
-        yPos = addImagesSection(pdf, radiographiesImages, 'RADIOGRAPHIES', margin, yPos, pageWidth, pageHeight)
+        yPos = addImagesSection(pdf, radiographiesImages, 'RADIOGRAPHIES', '🔬', margin, yPos, pageWidth, pageHeight)
       }
 
-      // Footer on last page
+      // ===== FOOTER =====
       const lastPage = pdf.internal.getNumberOfPages()
-      pdf.setPage(lastPage)
-      pdf.setFontSize(8)
-      pdf.setTextColor(128, 128, 128)
-      pdf.text(
-        `Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`,
-        pageWidth / 2,
-        pageHeight - 10,
-        { align: 'center' }
-      )
+      for (let i = 1; i <= lastPage; i++) {
+        pdf.setPage(i)
 
-      // Generate blob and URL for preview
+        // Footer line
+        pdf.setDrawColor(...COLORS.border)
+        pdf.setLineWidth(0.3)
+        pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15)
+
+        // Footer text
+        pdf.setFontSize(8)
+        pdf.setTextColor(...COLORS.textLight)
+        pdf.text(
+          `Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`,
+          margin,
+          pageHeight - 10
+        )
+        pdf.text(
+          `Page ${i}/${lastPage}`,
+          pageWidth - margin,
+          pageHeight - 10,
+          { align: 'right' }
+        )
+      }
+
+      // Generate blob and URL
       const blob = pdf.output('blob')
       const url = URL.createObjectURL(blob)
 
@@ -330,11 +595,8 @@ export default function PDFGenerator({ formData, onClose }) {
     }
   }
 
-  // Generate PDF on mount
   useEffect(() => {
     generatePDF()
-
-    // Cleanup URL on unmount
     return () => {
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl)
@@ -352,25 +614,17 @@ export default function PDFGenerator({ formData, onClose }) {
     if (!pdfUrl) return
     const printWindow = window.open(pdfUrl)
     if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print()
-      }
+      printWindow.onload = () => printWindow.print()
     }
   }
 
-  const handleShare = () => {
-    setShowShareModal(true)
-  }
+  const handleShare = () => setShowShareModal(true)
 
   const shareViaEmail = () => {
     const patientName = `${formData.patientName || ''} ${formData.patientSurname || ''}`.trim()
     const subject = encodeURIComponent(`Compte Rendu Opératoire - ${patientName}`)
     const body = encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint le compte rendu opératoire de ${patientName}.\n\nCordialement`)
-
-    const mailto = formData.patientMail
-      ? `mailto:${formData.patientMail}?subject=${subject}&body=${body}`
-      : `mailto:?subject=${subject}&body=${body}`
-
+    const mailto = formData.patientMail ? `mailto:${formData.patientMail}?subject=${subject}&body=${body}` : `mailto:?subject=${subject}&body=${body}`
     window.open(mailto)
   }
 
@@ -382,13 +636,9 @@ export default function PDFGenerator({ formData, onClose }) {
 
   const shareNative = async () => {
     if (!pdfBlob || !navigator.share) return
-
     const file = new File([pdfBlob], 'compte-rendu.pdf', { type: 'application/pdf' })
     try {
-      await navigator.share({
-        title: 'Compte Rendu Opératoire',
-        files: [file]
-      })
+      await navigator.share({ title: 'Compte Rendu Opératoire', files: [file] })
     } catch (e) {
       console.error('Share failed:', e)
     }
@@ -417,12 +667,8 @@ export default function PDFGenerator({ formData, onClose }) {
           ) : showShareModal ? (
             <div className="p-6">
               <p className="text-cemedis-700 font-medium mb-4 text-center">Partager le compte rendu</p>
-
               <div className="space-y-3 max-w-md mx-auto">
-                <button
-                  onClick={shareViaEmail}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                >
+                <button onClick={shareViaEmail} className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
                     <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -430,11 +676,7 @@ export default function PDFGenerator({ formData, onClose }) {
                   </div>
                   <span className="text-blue-700 font-medium">Envoyer par Email</span>
                 </button>
-
-                <button
-                  onClick={shareViaWhatsApp}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                >
+                <button onClick={shareViaWhatsApp} className="w-full flex items-center gap-3 px-4 py-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
                   <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
                     <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -442,12 +684,8 @@ export default function PDFGenerator({ formData, onClose }) {
                   </div>
                   <span className="text-green-700 font-medium">Partager via WhatsApp</span>
                 </button>
-
                 {navigator.share && (
-                  <button
-                    onClick={shareNative}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-                  >
+                  <button onClick={shareNative} className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors">
                     <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
                       <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -457,17 +695,12 @@ export default function PDFGenerator({ formData, onClose }) {
                   </button>
                 )}
               </div>
-
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="w-full mt-6 px-4 py-2 text-cemedis-600 hover:text-cemedis-700 transition-colors"
-              >
+              <button onClick={() => setShowShareModal(false)} className="w-full mt-6 px-4 py-2 text-cemedis-600 hover:text-cemedis-700 transition-colors">
                 Retour
               </button>
             </div>
           ) : (
             <>
-              {/* PDF Preview - takes most of the space */}
               <div className="flex-1 p-2 sm:p-4 bg-gray-100 min-h-0 overflow-hidden">
                 {pdfUrl && (
                   <iframe
@@ -479,34 +712,21 @@ export default function PDFGenerator({ formData, onClose }) {
                   />
                 )}
               </div>
-
-              {/* Action buttons */}
               <div className="p-3 sm:p-4 bg-white border-t border-gray-200 flex-shrink-0">
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  <button
-                    onClick={handleDownload}
-                    className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors text-sm sm:text-base"
-                  >
+                  <button onClick={handleDownload} className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors text-sm sm:text-base">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     <span className="hidden xs:inline sm:inline">Télécharger</span>
                   </button>
-
-                  <button
-                    onClick={handlePrint}
-                    className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 border-2 border-cemedis-500 text-cemedis-700 rounded-lg hover:bg-cemedis-50 transition-colors text-sm sm:text-base"
-                  >
+                  <button onClick={handlePrint} className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 border-2 border-cemedis-500 text-cemedis-700 rounded-lg hover:bg-cemedis-50 transition-colors text-sm sm:text-base">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                     </svg>
                     <span className="hidden xs:inline sm:inline">Imprimer</span>
                   </button>
-
-                  <button
-                    onClick={handleShare}
-                    className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 border-2 border-amber-500 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors text-sm sm:text-base"
-                  >
+                  <button onClick={handleShare} className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 border-2 border-amber-500 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors text-sm sm:text-base">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
