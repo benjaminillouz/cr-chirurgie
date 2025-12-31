@@ -1,6 +1,11 @@
-import { FormSection, FileUpload } from '../ui'
+import { FormSection, FileUpload, QRPhotoCapture } from '../ui'
 
 export default function Step4Tracabilite({ formData, updateFormData }) {
+  const handlePhotoReceived = (photo) => {
+    const currentPhotos = formData.tracabilitePhotos || []
+    updateFormData('tracabilitePhotos', [...currentPhotos, photo])
+  }
+
   return (
     <div>
       <FormSection title="Traçabilité implantaire">
@@ -8,12 +13,19 @@ export default function Step4Tracabilite({ formData, updateFormData }) {
           Ajoutez les photos des étiquettes de traçabilité des implants utilisés pendant l'intervention.
         </p>
 
+        <div className="flex flex-wrap gap-3 mb-4">
+          <QRPhotoCapture
+            onPhotoReceived={handlePhotoReceived}
+            label="Scanner avec téléphone"
+          />
+        </div>
+
         <FileUpload
-          label="Photos des étiquettes de traçabilité"
+          label="Ou importez depuis votre ordinateur"
           files={formData.tracabilitePhotos}
           onChange={(files) => updateFormData('tracabilitePhotos', files)}
           accept="image/*,.pdf"
-          maxFiles={5}
+          maxFiles={10}
         />
 
         <div className="mt-4 p-4 bg-cemedis-50 rounded-lg border border-cemedis-200">
