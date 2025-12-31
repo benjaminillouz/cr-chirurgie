@@ -8,6 +8,19 @@ import Step3Intervention from './components/steps/Step3Intervention'
 import Step4Tracabilite from './components/steps/Step4Tracabilite'
 import Step5Imagerie from './components/steps/Step5Imagerie'
 import Step6Observations from './components/steps/Step6Observations'
+import MobilePhotoCapture from './components/MobilePhotoCapture'
+import PDFGenerator from './components/PDFGenerator'
+
+// Check if we're in photo capture mode
+function isPhotoMode() {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('photo') === '1' && params.get('peer')
+}
+
+function getPhotoModePeerId() {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('peer')
+}
 
 // Parse URL parameters
 function getUrlParams() {
@@ -146,11 +159,17 @@ const getInitialFormData = (urlParams) => {
 }
 
 function App() {
+  // Check if we're in mobile photo capture mode
+  if (isPhotoMode()) {
+    return <MobilePhotoCapture peerId={getPhotoModePeerId()} />
+  }
+
   const [urlParams] = useState(getUrlParams)
   const [formData, setFormData] = useState(() => getInitialFormData(urlParams))
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [showPDFGenerator, setShowPDFGenerator] = useState(false)
 
   // Define steps based on intervention type
   const getSteps = useCallback(() => {
@@ -319,17 +338,35 @@ function App() {
           <p className="text-cemedis-600 mb-6">
             Le compte rendu opératoire a été créé avec succès.
           </p>
-          <button
-            onClick={() => {
-              setSubmitSuccess(false)
-              setFormData(getInitialFormData(urlParams))
-              setCurrentStep(1)
-            }}
-            className="bg-cemedis-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-cemedis-600 transition-colors"
-          >
-            Nouveau compte rendu
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => setShowPDFGenerator(true)}
+              className="w-full bg-cemedis-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-cemedis-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Générer le PDF
+            </button>
+            <button
+              onClick={() => {
+                setSubmitSuccess(false)
+                setFormData(getInitialFormData(urlParams))
+                setCurrentStep(1)
+              }}
+              className="w-full border-2 border-cemedis-500 text-cemedis-700 px-6 py-3 rounded-lg font-medium hover:bg-cemedis-50 transition-colors"
+            >
+              Nouveau compte rendu
+            </button>
+          </div>
         </div>
+
+        {showPDFGenerator && (
+          <PDFGenerator
+            formData={formData}
+            onClose={() => setShowPDFGenerator(false)}
+          />
+        )}
       </div>
     )
   }
