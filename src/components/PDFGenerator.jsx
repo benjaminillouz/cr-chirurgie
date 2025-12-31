@@ -360,34 +360,69 @@ export default function PDFGenerator({ formData, onClose }) {
       // ===== PRÉ-OPÉRATOIRE =====
       yPos = drawSectionHeader(pdf, 'PRÉ-OPÉRATOIRE', margin, yPos, pageWidth)
 
-      // Pre-op badges
-      let badgeX = margin
+      // Pre-op in structured box
+      const preOpBoxHeight = 42
+      pdf.setFillColor(...COLORS.white)
+      pdf.setDrawColor(...COLORS.border)
+      pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, preOpBoxHeight, 3, 3, 'FD')
+
+      const labelX = margin + 5
+      const valueX = margin + 45
+      let preOpY = yPos + 8
+
+      // Prémédication
+      pdf.setTextColor(...COLORS.textLight)
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text('Prémédication:', labelX, preOpY)
       if (formData.premedication?.length > 0) {
+        let badgeX = valueX
         formData.premedication.forEach(med => {
-          badgeX += drawBadge(pdf, med, badgeX, yPos + 3, COLORS.primary) + 2
+          badgeX += drawBadge(pdf, med, badgeX, preOpY, COLORS.primary) + 3
         })
-      }
-      if (formData.anesthesie?.length > 0) {
-        formData.anesthesie.forEach(anesth => {
-          badgeX += drawBadge(pdf, anesth, badgeX, yPos + 3, [59, 130, 246]) + 2 // blue
-        })
-      }
-      if (formData.nombreCarpules) {
-        badgeX += drawBadge(pdf, `${formData.nombreCarpules} carpules`, badgeX, yPos + 3, COLORS.success) + 2
-      }
-
-      yPos += badgeX > margin ? 12 : 2
-
-      if (formData.antisepsieLocale?.length > 0) {
-        pdf.setTextColor(...COLORS.textLight)
-        pdf.setFontSize(9)
-        pdf.text('Antisepsie:', margin, yPos)
+      } else {
         pdf.setTextColor(...COLORS.text)
-        pdf.text(formData.antisepsieLocale.join(', '), margin + 25, yPos)
-        yPos += 6
+        pdf.text('-', valueX, preOpY)
       }
 
-      yPos += 5
+      preOpY += 10
+
+      // Anesthésie
+      pdf.setTextColor(...COLORS.textLight)
+      pdf.setFontSize(9)
+      pdf.text('Anesthésie:', labelX, preOpY)
+      if (formData.anesthesie?.length > 0 || formData.nombreCarpules) {
+        let badgeX = valueX
+        if (formData.anesthesie?.length > 0) {
+          formData.anesthesie.forEach(anesth => {
+            badgeX += drawBadge(pdf, anesth, badgeX, preOpY, [59, 130, 246]) + 3 // blue
+          })
+        }
+        if (formData.nombreCarpules) {
+          badgeX += drawBadge(pdf, `${formData.nombreCarpules} carpule(s)`, badgeX, preOpY, COLORS.success) + 3
+        }
+      } else {
+        pdf.setTextColor(...COLORS.text)
+        pdf.text('-', valueX, preOpY)
+      }
+
+      preOpY += 10
+
+      // Antisepsie
+      pdf.setTextColor(...COLORS.textLight)
+      pdf.setFontSize(9)
+      pdf.text('Antisepsie:', labelX, preOpY)
+      if (formData.antisepsieLocale?.length > 0) {
+        let badgeX = valueX
+        formData.antisepsieLocale.forEach(antisep => {
+          badgeX += drawBadge(pdf, antisep, badgeX, preOpY, [168, 85, 247]) + 3 // purple
+        })
+      } else {
+        pdf.setTextColor(...COLORS.text)
+        pdf.text('-', valueX, preOpY)
+      }
+
+      yPos += preOpBoxHeight + 8
 
       // ===== INTERVENTION DETAILS =====
       yPos = checkNewPage(pdf, yPos, margin, pageHeight, 60)
