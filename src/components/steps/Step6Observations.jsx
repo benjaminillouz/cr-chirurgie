@@ -4,9 +4,23 @@ const OUI_NON = ['Oui', 'Non']
 
 const RDV_CONTROLE_OPTIONS = Array.from({ length: 18 }, (_, i) => (i + 3).toString())
 
-export default function Step6Observations({ formData, updateFormData }) {
+export default function Step6Observations({ formData, updateFormData, onGeneratePDF }) {
   return (
     <div>
+      {/* Button to generate PDF at the top */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={onGeneratePDF}
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-cemedis-500 text-white rounded-xl font-semibold hover:bg-cemedis-600 transition-all shadow-lg shadow-cemedis-500/30"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Éditer le compte rendu
+        </button>
+      </div>
+
       <FormSection title="Observations">
         <TextArea
           label="Notes et observations"
@@ -35,20 +49,6 @@ export default function Step6Observations({ formData, updateFormData }) {
           placeholder="Sélectionner le nombre de jours"
         />
       </FormSection>
-
-      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-        <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-green-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h4 className="text-sm font-medium text-green-800">Prêt à valider</h4>
-            <p className="text-sm text-green-700 mt-1">
-              Vérifiez les informations saisies puis cliquez sur "Éditer le compte rendu" pour finaliser.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

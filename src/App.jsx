@@ -167,8 +167,6 @@ function App() {
   const [urlParams] = useState(getUrlParams)
   const [formData, setFormData] = useState(() => getInitialFormData(urlParams))
   const [currentStep, setCurrentStep] = useState(1)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitSuccess, setSubmitSuccess] = useState(false)
   const [showPDFGenerator, setShowPDFGenerator] = useState(false)
 
   // Define steps based on intervention type
@@ -235,29 +233,10 @@ function App() {
     }
   }, [totalSteps])
 
-  // Form submission
-  const handleSubmit = async () => {
-    setIsSubmitting(true)
-
-    try {
-      const submitData = {
-        ...formData,
-        submittedAt: new Date().toISOString()
-      }
-
-      console.log('Form submitted:', submitData)
-
-      // TODO: Send to backend API
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
-      setSubmitSuccess(true)
-    } catch (error) {
-      console.error('Submission error:', error)
-      alert('Erreur lors de la soumission. Veuillez réessayer.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  // Open PDF Generator
+  const handleGeneratePDF = useCallback(() => {
+    setShowPDFGenerator(true)
+  }, [])
 
   // Render current step content
   const renderStepContent = () => {
@@ -316,6 +295,7 @@ function App() {
         <Step6Observations
           formData={formData}
           updateFormData={updateFormData}
+          onGeneratePDF={handleGeneratePDF}
         />
       )
     }
@@ -323,56 +303,15 @@ function App() {
     return null
   }
 
-  // Success screen
-  if (submitSuccess) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-cemedis-50 to-cemedis-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center animate-fade-in">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-cemedis-800 mb-2">
-            Compte rendu enregistré
-          </h2>
-          <p className="text-cemedis-600 mb-6">
-            Le compte rendu opératoire a été créé avec succès.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowPDFGenerator(true)}
-              className="w-full bg-cemedis-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-cemedis-600 transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              Générer le PDF
-            </button>
-            <button
-              onClick={() => {
-                setSubmitSuccess(false)
-                setFormData(getInitialFormData(urlParams))
-                setCurrentStep(1)
-              }}
-              className="w-full border-2 border-cemedis-500 text-cemedis-700 px-6 py-3 rounded-lg font-medium hover:bg-cemedis-50 transition-colors"
-            >
-              Nouveau compte rendu
-            </button>
-          </div>
-        </div>
-
-        {showPDFGenerator && (
-          <PDFGenerator
-            formData={formData}
-            onClose={() => setShowPDFGenerator(false)}
-          />
-        )}
-      </div>
-    )
-  }
-
   return (
+    <>
+    {showPDFGenerator && (
+      <PDFGenerator
+        formData={formData}
+        onClose={() => setShowPDFGenerator(false)}
+      />
+    )}
+
     <div className="min-h-screen bg-gradient-to-br from-cemedis-50 to-cemedis-100">
       <FormHeader />
 
@@ -425,13 +364,12 @@ function App() {
             totalSteps={totalSteps}
             onPrev={goToPrevStep}
             onNext={goToNextStep}
-            onSubmit={handleSubmit}
-            isSubmitting={isSubmitting}
             canProceed={currentStep === 1 ? !!formData.interventionType : true}
           />
         </div>
       </main>
     </div>
+    </>
   )
 }
 
