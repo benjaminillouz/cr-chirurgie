@@ -695,12 +695,22 @@ export default function PDFGenerator({ formData, onClose }) {
   const [gmailLoading, setGmailLoading] = useState(false)
   const [gmailError, setGmailError] = useState(null)
 
+  const [gmailRecipient, setGmailRecipient] = useState('')
+  const [showGmailForm, setShowGmailForm] = useState(false)
+
   const shareViaGmail = async () => {
     if (!pdfBlob) return
 
     // Check if Google Identity Services is loaded
     if (!window.google?.accounts?.oauth2) {
       setGmailError('Service Gmail non disponible. Veuillez rafraîchir la page.')
+      return
+    }
+
+    // Check for recipient email
+    const recipient = gmailRecipient || formData.patientMail
+    if (!recipient) {
+      setShowGmailForm(true)
       return
     }
 
@@ -740,7 +750,11 @@ export default function PDFGenerator({ formData, onClose }) {
   }
 
   const sendGmailWithAttachment = async (accessToken) => {
-    const patientEmail = formData.patientMail || ''
+    const patientEmail = gmailRecipient || formData.patientMail || ''
+
+    if (!patientEmail) {
+      throw new Error('Adresse email du destinataire requise')
+    }
     const subject = `Compte Rendu Opératoire - ${getPatientName()}`
     const body = `Bonjour,\n\nVeuillez trouver ci-joint le compte rendu opératoire de ${getPatientName()} du ${formatDate(formData.interventionDate)}.\n\nCordialement`
 
@@ -839,6 +853,42 @@ export default function PDFGenerator({ formData, onClose }) {
               )}
 
               <div className="space-y-3 max-w-md mx-auto">
+                {/* Gmail email input form */}
+                {showGmailForm && (
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email du destinataire
+                    </label>
+                    <input
+                      type="email"
+                      value={gmailRecipient}
+                      onChange={(e) => setGmailRecipient(e.target.value)}
+                      placeholder="exemple@email.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-3"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (gmailRecipient) {
+                            setShowGmailForm(false)
+                            shareViaGmail()
+                          }
+                        }}
+                        disabled={!gmailRecipient}
+                        className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Envoyer
+                      </button>
+                      <button
+                        onClick={() => setShowGmailForm(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Gmail - avec pièce jointe via OAuth */}
                 <button
                   onClick={shareViaGmail}
