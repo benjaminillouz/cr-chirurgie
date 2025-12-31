@@ -297,13 +297,6 @@ export default function PDFGenerator({ formData, onClose }) {
       pdf.setFillColor(...COLORS.primary)
       pdf.rect(0, 0, pageWidth, 40, 'F')
 
-      // Logo area placeholder
-      pdf.setFillColor(255, 255, 255, 0.1)
-      pdf.circle(25, 20, 12, 'F')
-      pdf.setTextColor(...COLORS.white)
-      pdf.setFontSize(8)
-      pdf.text('CEMEDIS', 18, 22)
-
       // Title
       pdf.setTextColor(...COLORS.white)
       pdf.setFontSize(20)
