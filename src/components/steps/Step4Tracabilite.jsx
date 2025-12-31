@@ -1,10 +1,11 @@
+import { useCallback } from 'react'
 import { FormSection, FileUpload, QRPhotoCapture } from '../ui'
 
 export default function Step4Tracabilite({ formData, updateFormData }) {
-  const handlePhotoReceived = (photo) => {
-    const currentPhotos = formData.tracabilitePhotos || []
-    updateFormData('tracabilitePhotos', [...currentPhotos, photo])
-  }
+  // Use functional update to avoid stale closure when multiple photos arrive quickly
+  const handlePhotoReceived = useCallback((photo) => {
+    updateFormData('tracabilitePhotos', (currentPhotos) => [...(currentPhotos || []), photo])
+  }, [updateFormData])
 
   return (
     <div>

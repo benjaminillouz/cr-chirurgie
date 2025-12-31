@@ -1,76 +1,107 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { FormSection, FileUpload, QRPhotoCapture } from '../ui'
 
 export default function Step5Imagerie({ formData, updateFormData }) {
   const [isCapturing, setIsCapturing] = useState(false)
-  const [capturePreview, setCapturePreview] = useState(null)
-  const [captureCount, setCaptureCount] = useState(0)
-  const videoRef = useRef(null)
-  const streamRef = useRef(null)
 
-  const handlePhotoReceived = (photo) => {
-    const currentPhotos = formData.radiographies || []
-    updateFormData('radiographies', [...currentPhotos, photo])
-  }
+  // Use functional update to avoid stale closure when multiple photos arrive quickly
+  const handlePhotoReceived = useCallback((photo) => {
+    updateFormData('radiographies', (currentPhotos) => [...(currentPhotos || []), photo])
+  }, [updateFormData])
 
-  const startScreenCapture = async () => {
+  // Simplified screen capture - captures immediately like plan-de-traitement
+  const captureScreen = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { mediaSource: 'screen' }
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
       setIsCapturing(true)
-      setCaptureCount(0)
 
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenCapture()
+      // Request screen sharing
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: 'always' },
+        audio: false
+      })
+
+      // Create video element to capture frame
+      const video = document.createElement('video')
+      video.srcObject = stream
+      video.autoplay = true
+      video.playsInline = true
+
+      // Wait for video to be ready
+      await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play()
+          resolve()
+        }
+      })
+
+      // Small delay to ensure video is ready
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Create canvas and capture the frame
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0)
+
+      // Stop the stream immediately
+      stream.getTracks().forEach(track => track.stop())
+
+      // Convert to base64
+      const imageData = canvas.toDataURL('image/png')
+
+      // Compress if needed (optional - for large screenshots)
+      const compressedData = await compressImage(imageData, 1200, 0.8)
+
+      // Create screenshot object
+      const screenshotObj = {
+        id: `screenshot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        preview: compressedData,
+        name: `Radiographie ${new Date().toLocaleDateString('fr-FR')}`,
+        isScreenshot: true,
+        date: new Date().toLocaleDateString('fr-FR')
       }
-    } catch (err) {
-      console.error('Screen capture error:', err)
+
+      // Add to radiographies using functional update
+      updateFormData('radiographies', (currentPhotos) => [...(currentPhotos || []), screenshotObj])
+
+      setIsCapturing(false)
+
+    } catch (error) {
+      console.error('Screen capture error:', error)
+      setIsCapturing(false)
+
+      if (error.name !== 'NotAllowedError') {
+        alert('Erreur lors de la capture d\'écran')
+      }
     }
   }
 
-  const takeScreenshot = useCallback(() => {
-    if (!videoRef.current) return
+  // Compress image helper function
+  const compressImage = (imageDataUrl, maxWidth = 1200, quality = 0.8) => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
 
-    const canvas = document.createElement('canvas')
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(videoRef.current, 0, 0)
+        let width = img.width
+        let height = img.height
 
-    const screenshotData = canvas.toDataURL('image/png')
-    setCapturePreview(screenshotData)
-  }, [])
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
 
-  const saveScreenshot = useCallback(() => {
-    if (!capturePreview) return
+        canvas.width = width
+        canvas.height = height
+        ctx.drawImage(img, 0, 0, width, height)
 
-    const screenshotObj = {
-      id: `screenshot-${Date.now()}`,
-      preview: capturePreview,
-      name: `capture-${new Date().toISOString().slice(0, 10)}-${captureCount + 1}.png`,
-      isScreenshot: true
-    }
-
-    const currentPhotos = formData.radiographies || []
-    updateFormData('radiographies', [...currentPhotos, screenshotObj])
-    setCapturePreview(null)
-    setCaptureCount(prev => prev + 1)
-    // Don't close - allow taking more captures
-  }, [capturePreview, formData.radiographies, updateFormData, captureCount])
-
-  const stopScreenCapture = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-      streamRef.current = null
-    }
-    setIsCapturing(false)
-    setCapturePreview(null)
-    setCaptureCount(0)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => resolve(imageDataUrl) // Fallback to original
+      img.src = imageDataUrl
+    })
   }
 
   return (
@@ -88,90 +119,32 @@ export default function Step5Imagerie({ formData, updateFormData }) {
 
           <button
             type="button"
-            onClick={startScreenCapture}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+            onClick={captureScreen}
+            disabled={isCapturing}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors ${
+              isCapturing
+                ? 'bg-amber-300 text-amber-800 cursor-wait'
+                : 'bg-amber-500 text-white hover:bg-amber-600'
+            }`}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            Capture d'écran
+            {isCapturing ? (
+              <>
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Capture en cours...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Capture d'écran
+              </>
+            )}
           </button>
         </div>
-
-        {/* Screen capture modal */}
-        {isCapturing && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden">
-              <div className="bg-amber-500 text-white px-6 py-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">Capture d'écran</h3>
-                  {captureCount > 0 && (
-                    <p className="text-sm text-amber-100">{captureCount} capture(s) enregistrée(s)</p>
-                  )}
-                </div>
-                <button onClick={stopScreenCapture} className="hover:bg-white/20 rounded-lg p-1 transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="p-6">
-                {capturePreview ? (
-                  <div>
-                    <img src={capturePreview} alt="Capture" className="w-full rounded-lg border border-cemedis-200 mb-4" />
-                    <div className="flex justify-center gap-4">
-                      <button
-                        onClick={() => setCapturePreview(null)}
-                        className="px-4 py-2 border border-cemedis-300 text-cemedis-700 rounded-lg hover:bg-cemedis-50 transition-colors"
-                      >
-                        Reprendre
-                      </button>
-                      <button
-                        onClick={saveScreenshot}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Enregistrer
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      className="w-full rounded-lg border border-cemedis-200 mb-4"
-                    />
-                    <div className="flex justify-center gap-4">
-                      <button
-                        onClick={takeScreenshot}
-                        className="px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Capturer
-                      </button>
-                      {captureCount > 0 && (
-                        <button
-                          onClick={stopScreenCapture}
-                          className="px-6 py-3 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors"
-                        >
-                          Terminé
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         <FileUpload
           label="Ou importez depuis votre ordinateur"

@@ -1,21 +1,21 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
-import { QRCodeSVG } from 'qrcode.react'
 
 const INTERVENTION_LABELS = {
-  implantologie: 'Implantologie',
-  chirurgiePreImplantaire: 'Chirurgie Pré Implantaire',
-  avulsions: 'Avulsions',
-  freinectomies: 'Freinectomies',
-  miniVis: 'Mini Vis'
+  'Implantologie': 'Implantologie',
+  'Chirurgie Pré Implantaire': 'Chirurgie Pré Implantaire',
+  'Avulsions': 'Avulsions',
+  'Freinectomies': 'Freinectomies',
+  'Mini Vis': 'Mini Vis'
 }
 
 export default function PDFGenerator({ formData, onClose }) {
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
   const [pdfBlob, setPdfBlob] = useState(null)
-  const contentRef = useRef(null)
+  const [pdfUrl, setPdfUrl] = useState(null)
+  const [pdfRef, setPdfRef] = useState(null)
+  const iframeRef = useRef(null)
 
   const formatDate = (date) => {
     if (!date) return '-'
@@ -27,8 +27,6 @@ export default function PDFGenerator({ formData, onClose }) {
   }
 
   const generatePDF = async () => {
-    setIsGenerating(true)
-
     try {
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
@@ -47,7 +45,7 @@ export default function PDFGenerator({ formData, onClose }) {
 
       pdf.setFontSize(10)
       pdf.setFont('helvetica', 'normal')
-      pdf.text(`Date: ${formatDate(formData.dateIntervention)}`, pageWidth / 2, 25, { align: 'center' })
+      pdf.text(`Date: ${formatDate(formData.interventionDate)}`, pageWidth / 2, 25, { align: 'center' })
 
       yPos = 45
 
@@ -90,20 +88,12 @@ export default function PDFGenerator({ formData, onClose }) {
       pdf.setFontSize(10)
       pdf.setFont('helvetica', 'normal')
 
-      const typeLabel = INTERVENTION_LABELS[formData.typeIntervention] || formData.typeIntervention
+      const typeLabel = INTERVENTION_LABELS[formData.interventionType] || formData.interventionType || '-'
       pdf.setFont('helvetica', 'bold')
       pdf.text('Type: ', margin, yPos)
       pdf.setFont('helvetica', 'normal')
-      pdf.text(typeLabel || '-', margin + 35, yPos)
+      pdf.text(typeLabel, margin + 35, yPos)
       yPos += 6
-
-      if (formData.selectedTeeth?.length > 0) {
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('Dents: ', margin, yPos)
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(formData.selectedTeeth.join(', '), margin + 35, yPos)
-        yPos += 6
-      }
 
       // Pre-operative section
       yPos += 5
@@ -116,19 +106,31 @@ export default function PDFGenerator({ formData, onClose }) {
       pdf.setTextColor(60, 60, 60)
       pdf.setFontSize(10)
 
-      const preOpInfo = [
-        ['Antibioprophylaxie', formData.antibioprophylaxie || '-'],
-        ['Prémédication', formData.premedication || '-'],
-        ['Type anesthésie', formData.typeAnesthesie || '-']
-      ]
-
-      preOpInfo.forEach(([label, value]) => {
+      // Premedication
+      if (formData.premedication?.length > 0) {
         pdf.setFont('helvetica', 'bold')
-        pdf.text(`${label}: `, margin, yPos)
+        pdf.text('Prémédication: ', margin, yPos)
         pdf.setFont('helvetica', 'normal')
-        pdf.text(value, margin + 45, yPos)
+        pdf.text(formData.premedication.join(', '), margin + 35, yPos)
         yPos += 6
-      })
+      }
+
+      // Anesthesia
+      if (formData.anesthesie?.length > 0) {
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('Anesthésie: ', margin, yPos)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(formData.anesthesie.join(', '), margin + 35, yPos)
+        yPos += 6
+      }
+
+      if (formData.nombreCarpules) {
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('Nb carpules: ', margin, yPos)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(formData.nombreCarpules, margin + 35, yPos)
+        yPos += 6
+      }
 
       // Observations
       if (formData.observations) {
@@ -165,10 +167,12 @@ export default function PDFGenerator({ formData, onClose }) {
       pdf.text(formData.ficheConseilsRemise || '-', margin + 45, yPos)
       yPos += 6
 
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('RDV contrôle J+: ', margin, yPos)
-      pdf.setFont('helvetica', 'normal')
-      pdf.text(formData.rdvControleJour || '-', margin + 45, yPos)
+      if (formData.rdvControleJour) {
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('RDV contrôle J+: ', margin, yPos)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(formData.rdvControleJour, margin + 45, yPos)
+      }
 
       // Add images if present (tracabilite and radiographies)
       const allImages = [
@@ -228,9 +232,13 @@ export default function PDFGenerator({ formData, onClose }) {
         { align: 'center' }
       )
 
-      // Generate blob for sharing
+      // Generate blob and URL for preview
       const blob = pdf.output('blob')
+      const url = URL.createObjectURL(blob)
+
       setPdfBlob(blob)
+      setPdfUrl(url)
+      setPdfRef(pdf)
 
       return pdf
     } catch (error) {
@@ -241,17 +249,27 @@ export default function PDFGenerator({ formData, onClose }) {
     }
   }
 
-  const handleDownload = async () => {
-    const pdf = await generatePDF()
-    const filename = `CR_${formData.patientName || 'Patient'}_${formData.patientSurname || ''}_${formatDate(formData.dateIntervention).replace(/\//g, '-')}.pdf`
-    pdf.save(filename)
+  // Generate PDF on mount
+  useEffect(() => {
+    generatePDF()
+
+    // Cleanup URL on unmount
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl)
+      }
+    }
+  }, [])
+
+  const handleDownload = () => {
+    if (!pdfRef) return
+    const filename = `CR_${formData.patientName || 'Patient'}_${formData.patientSurname || ''}_${formatDate(formData.interventionDate).replace(/\//g, '-')}.pdf`
+    pdfRef.save(filename)
   }
 
-  const handlePrint = async () => {
-    const pdf = await generatePDF()
-    const blob = pdf.output('blob')
-    const url = URL.createObjectURL(blob)
-    const printWindow = window.open(url)
+  const handlePrint = () => {
+    if (!pdfUrl) return
+    const printWindow = window.open(pdfUrl)
     if (printWindow) {
       printWindow.onload = () => {
         printWindow.print()
@@ -259,19 +277,15 @@ export default function PDFGenerator({ formData, onClose }) {
     }
   }
 
-  const handleShare = async () => {
-    await generatePDF()
+  const handleShare = () => {
     setShowShareModal(true)
   }
 
   const shareViaEmail = () => {
-    if (!pdfBlob) return
-
     const patientName = `${formData.patientName || ''} ${formData.patientSurname || ''}`.trim()
     const subject = encodeURIComponent(`Compte Rendu Opératoire - ${patientName}`)
     const body = encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint le compte rendu opératoire de ${patientName}.\n\nCordialement`)
 
-    // If patient email is available, use it
     const mailto = formData.patientMail
       ? `mailto:${formData.patientMail}?subject=${subject}&body=${body}`
       : `mailto:?subject=${subject}&body=${body}`
@@ -281,28 +295,29 @@ export default function PDFGenerator({ formData, onClose }) {
 
   const shareViaWhatsApp = () => {
     const patientName = `${formData.patientName || ''} ${formData.patientSurname || ''}`.trim()
-    const text = encodeURIComponent(`Compte Rendu Opératoire - ${patientName}\nDate: ${formatDate(formData.dateIntervention)}`)
+    const text = encodeURIComponent(`Compte Rendu Opératoire - ${patientName}\nDate: ${formatDate(formData.interventionDate)}`)
     window.open(`https://wa.me/?text=${text}`)
   }
 
-  const copyToClipboard = async () => {
-    if (!pdfBlob) return
+  const shareNative = async () => {
+    if (!pdfBlob || !navigator.share) return
 
+    const file = new File([pdfBlob], 'compte-rendu.pdf', { type: 'application/pdf' })
     try {
-      // Create a temporary download link
-      const url = URL.createObjectURL(pdfBlob)
-      await navigator.clipboard.writeText(url)
-      alert('Lien copié dans le presse-papier')
-    } catch (error) {
-      console.error('Copy failed:', error)
+      await navigator.share({
+        title: 'Compte Rendu Opératoire',
+        files: [file]
+      })
+    } catch (e) {
+      console.error('Share failed:', e)
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in">
-        <div className="bg-cemedis-500 text-white px-6 py-4 flex items-center justify-between">
-          <h3 className="font-semibold">Générer le compte rendu</h3>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
+        <div className="bg-cemedis-500 text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
+          <h3 className="font-semibold">Compte rendu opératoire</h3>
           <button onClick={onClose} className="hover:bg-white/20 rounded-lg p-1 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -310,17 +325,19 @@ export default function PDFGenerator({ formData, onClose }) {
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {isGenerating ? (
-            <div className="text-center py-8">
-              <div className="animate-spin w-12 h-12 border-4 border-cemedis-200 border-t-cemedis-500 rounded-full mx-auto mb-4"></div>
-              <p className="text-cemedis-600">Génération du PDF en cours...</p>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center py-8">
+                <div className="animate-spin w-12 h-12 border-4 border-cemedis-200 border-t-cemedis-500 rounded-full mx-auto mb-4"></div>
+                <p className="text-cemedis-600">Génération du PDF en cours...</p>
+              </div>
             </div>
           ) : showShareModal ? (
-            <div>
+            <div className="p-6">
               <p className="text-cemedis-700 font-medium mb-4 text-center">Partager le compte rendu</p>
 
-              <div className="space-y-3">
+              <div className="space-y-3 max-w-md mx-auto">
                 <button
                   onClick={shareViaEmail}
                   className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -347,19 +364,7 @@ export default function PDFGenerator({ formData, onClose }) {
 
                 {navigator.share && (
                   <button
-                    onClick={async () => {
-                      if (pdfBlob) {
-                        const file = new File([pdfBlob], 'compte-rendu.pdf', { type: 'application/pdf' })
-                        try {
-                          await navigator.share({
-                            title: 'Compte Rendu Opératoire',
-                            files: [file]
-                          })
-                        } catch (e) {
-                          console.error('Share failed:', e)
-                        }
-                      }
-                    }}
+                    onClick={shareNative}
                     className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                   >
                     <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
@@ -374,54 +379,60 @@ export default function PDFGenerator({ formData, onClose }) {
 
               <button
                 onClick={() => setShowShareModal(false)}
-                className="w-full mt-4 px-4 py-2 text-cemedis-600 hover:text-cemedis-700 transition-colors"
+                className="w-full mt-6 px-4 py-2 text-cemedis-600 hover:text-cemedis-700 transition-colors"
               >
                 Retour
               </button>
             </div>
           ) : (
-            <div>
-              <div className="bg-cemedis-50 rounded-xl p-4 mb-6">
-                <h4 className="text-cemedis-700 font-medium mb-2">Récapitulatif</h4>
-                <div className="text-sm text-cemedis-600 space-y-1">
-                  <p><span className="font-medium">Patient:</span> {formData.patientName} {formData.patientSurname}</p>
-                  <p><span className="font-medium">Date:</span> {formatDate(formData.dateIntervention)}</p>
-                  <p><span className="font-medium">Intervention:</span> {INTERVENTION_LABELS[formData.typeIntervention] || '-'}</p>
+            <>
+              {/* PDF Preview */}
+              <div className="flex-1 p-4 bg-gray-100 min-h-0">
+                {pdfUrl && (
+                  <iframe
+                    ref={iframeRef}
+                    src={pdfUrl}
+                    className="w-full h-full rounded-lg border border-gray-300 bg-white"
+                    title="Aperçu du compte rendu"
+                  />
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span className="hidden sm:inline">Télécharger</span>
+                  </button>
+
+                  <button
+                    onClick={handlePrint}
+                    className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-cemedis-500 text-cemedis-700 rounded-lg hover:bg-cemedis-50 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    <span className="hidden sm:inline">Imprimer</span>
+                  </button>
+
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-amber-500 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span className="hidden sm:inline">Partager</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Télécharger le PDF
-                </button>
-
-                <button
-                  onClick={handlePrint}
-                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-cemedis-500 text-cemedis-700 rounded-lg hover:bg-cemedis-50 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                  Imprimer
-                </button>
-
-                <button
-                  onClick={handleShare}
-                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-amber-500 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  Partager
-                </button>
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>
