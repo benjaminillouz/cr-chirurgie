@@ -4,6 +4,7 @@ import { FormSection, FileUpload, QRPhotoCapture } from '../ui'
 export default function Step5Imagerie({ formData, updateFormData }) {
   const [isCapturing, setIsCapturing] = useState(false)
   const [capturePreview, setCapturePreview] = useState(null)
+  const [captureCount, setCaptureCount] = useState(0)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -22,6 +23,7 @@ export default function Step5Imagerie({ formData, updateFormData }) {
         videoRef.current.srcObject = stream
       }
       setIsCapturing(true)
+      setCaptureCount(0)
 
       stream.getVideoTracks()[0].onended = () => {
         stopScreenCapture()
@@ -50,15 +52,16 @@ export default function Step5Imagerie({ formData, updateFormData }) {
     const screenshotObj = {
       id: `screenshot-${Date.now()}`,
       preview: capturePreview,
-      name: `capture-${new Date().toISOString().slice(0, 10)}.png`,
+      name: `capture-${new Date().toISOString().slice(0, 10)}-${captureCount + 1}.png`,
       isScreenshot: true
     }
 
     const currentPhotos = formData.radiographies || []
     updateFormData('radiographies', [...currentPhotos, screenshotObj])
     setCapturePreview(null)
-    stopScreenCapture()
-  }, [capturePreview, formData.radiographies, updateFormData])
+    setCaptureCount(prev => prev + 1)
+    // Don't close - allow taking more captures
+  }, [capturePreview, formData.radiographies, updateFormData, captureCount])
 
   const stopScreenCapture = () => {
     if (streamRef.current) {
@@ -67,6 +70,7 @@ export default function Step5Imagerie({ formData, updateFormData }) {
     }
     setIsCapturing(false)
     setCapturePreview(null)
+    setCaptureCount(0)
   }
 
   return (
@@ -99,7 +103,12 @@ export default function Step5Imagerie({ formData, updateFormData }) {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
             <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden">
               <div className="bg-amber-500 text-white px-6 py-4 flex items-center justify-between">
-                <h3 className="font-semibold">Capture d'écran</h3>
+                <div>
+                  <h3 className="font-semibold">Capture d'écran</h3>
+                  {captureCount > 0 && (
+                    <p className="text-sm text-amber-100">{captureCount} capture(s) enregistrée(s)</p>
+                  )}
+                </div>
                 <button onClick={stopScreenCapture} className="hover:bg-white/20 rounded-lg p-1 transition-colors">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -120,8 +129,11 @@ export default function Step5Imagerie({ formData, updateFormData }) {
                       </button>
                       <button
                         onClick={saveScreenshot}
-                        className="px-4 py-2 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors"
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
                       >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
                         Enregistrer
                       </button>
                     </div>
@@ -134,7 +146,7 @@ export default function Step5Imagerie({ formData, updateFormData }) {
                       playsInline
                       className="w-full rounded-lg border border-cemedis-200 mb-4"
                     />
-                    <div className="flex justify-center">
+                    <div className="flex justify-center gap-4">
                       <button
                         onClick={takeScreenshot}
                         className="px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center gap-2"
@@ -145,6 +157,14 @@ export default function Step5Imagerie({ formData, updateFormData }) {
                         </svg>
                         Capturer
                       </button>
+                      {captureCount > 0 && (
+                        <button
+                          onClick={stopScreenCapture}
+                          className="px-6 py-3 bg-cemedis-500 text-white rounded-lg hover:bg-cemedis-600 transition-colors"
+                        >
+                          Terminé
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

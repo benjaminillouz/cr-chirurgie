@@ -48,7 +48,7 @@ export default function FileUpload({
               key={fileObj.id}
               className="relative group rounded-lg overflow-hidden border-2 border-cemedis-200 bg-cemedis-50"
             >
-              {fileObj.file?.type?.startsWith('image/') ? (
+              {(fileObj.file?.type?.startsWith('image/') || fileObj.fromMobile || fileObj.isScreenshot || fileObj.preview?.startsWith('data:image')) ? (
                 <img
                   src={fileObj.preview}
                   alt={fileObj.name}
