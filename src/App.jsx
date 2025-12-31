@@ -9,6 +9,7 @@ import Step4Tracabilite from './components/steps/Step4Tracabilite'
 import Step5Imagerie from './components/steps/Step5Imagerie'
 import Step6Observations from './components/steps/Step6Observations'
 import MobilePhotoCapture from './components/MobilePhotoCapture'
+import MobilePDFReceiver from './components/MobilePDFReceiver'
 import PDFGenerator from './components/PDFGenerator'
 
 // Check if we're in photo capture mode
@@ -18,6 +19,17 @@ function isPhotoMode() {
 }
 
 function getPhotoModePeerId() {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('peer')
+}
+
+// Check if we're in PDF receive mode
+function isPDFMode() {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('pdf') === '1' && params.get('peer')
+}
+
+function getPDFModePeerId() {
   const params = new URLSearchParams(window.location.search)
   return params.get('peer')
 }
@@ -162,6 +174,11 @@ function App() {
   // Check if we're in mobile photo capture mode
   if (isPhotoMode()) {
     return <MobilePhotoCapture peerId={getPhotoModePeerId()} />
+  }
+
+  // Check if we're in PDF receive mode (from QR scan)
+  if (isPDFMode()) {
+    return <MobilePDFReceiver peerId={getPDFModePeerId()} />
   }
 
   const [urlParams] = useState(getUrlParams)
