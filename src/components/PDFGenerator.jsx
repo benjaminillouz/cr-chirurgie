@@ -704,11 +704,6 @@ export default function PDFGenerator({ formData, onClose }) {
       return
     }
 
-    if (!GMAIL_CLIENT_ID) {
-      setGmailError('Configuration Gmail manquante (VITE_GMAIL_CLIENT_ID)')
-      return
-    }
-
     setGmailLoading(true)
     setGmailError(null)
 
