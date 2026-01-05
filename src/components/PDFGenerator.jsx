@@ -467,14 +467,15 @@ export default function PDFGenerator({ formData, onClose }) {
         yPos = drawField(pdf, 'Vis', imp.vis, margin, yPos, pageWidth)
 
         // Sutures in a grouped box
-        if (imp.sutures || imp.fil || imp.typeFil) {
+        const impSuturesText = Array.isArray(imp.sutures) && imp.sutures.length > 0 ? imp.sutures.join(', ') : imp.sutures
+        if (impSuturesText || imp.fil || imp.typeFil) {
           yPos = checkNewPage(pdf, yPos, margin, pageHeight, 20)
           pdf.setFillColor(252, 252, 253)
           pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 12, 2, 2, 'F')
           pdf.setTextColor(...COLORS.textLight)
           pdf.setFontSize(8)
           pdf.text('Sutures:', margin + 3, yPos + 5)
-          let sutureText = [imp.sutures, imp.fil, imp.typeFil].filter(Boolean).join(' • ')
+          let sutureText = [impSuturesText, imp.fil, imp.typeFil].filter(Boolean).join(' • ')
           pdf.setTextColor(...COLORS.text)
           pdf.text(sutureText, margin + 22, yPos + 5)
           yPos += 15
@@ -492,7 +493,8 @@ export default function PDFGenerator({ formData, onClose }) {
         if (chir.revisionPlaie) yPos = drawField(pdf, 'Révision plaie', 'Oui', margin, yPos, pageWidth)
         if (chir.nettoyageCHX) yPos = drawField(pdf, 'Nettoyage CHX', 'Oui', margin, yPos, pageWidth)
         yPos = drawField(pdf, 'Biomatériaux', chir.biomateriaux, margin, yPos, pageWidth)
-        yPos = drawField(pdf, 'Sutures', [chir.sutures, chir.fil, chir.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
+        const chirSuturesText = Array.isArray(chir.sutures) && chir.sutures.length > 0 ? chir.sutures.join(', ') : chir.sutures
+        yPos = drawField(pdf, 'Sutures', [chirSuturesText, chir.fil, chir.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
         yPos = drawField(pdf, 'Hémostase', chir.hemostase, margin, yPos, pageWidth)
       }
 
@@ -507,7 +509,8 @@ export default function PDFGenerator({ formData, onClose }) {
         yPos = drawField(pdf, 'Séparation rac.', avul.separationRacines, margin, yPos, pageWidth)
         if (avul.revisionPlaie) yPos = drawField(pdf, 'Révision plaie', 'Oui', margin, yPos, pageWidth)
         if (avul.rincageCHX) yPos = drawField(pdf, 'Rinçage CHX', 'Oui', margin, yPos, pageWidth)
-        yPos = drawField(pdf, 'Sutures', [avul.sutures, avul.fil, avul.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
+        const avulSuturesText = Array.isArray(avul.sutures) && avul.sutures.length > 0 ? avul.sutures.join(', ') : avul.sutures
+        yPos = drawField(pdf, 'Sutures', [avulSuturesText, avul.fil, avul.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
         yPos = drawField(pdf, 'Hémostase', avul.hemostase, margin, yPos, pageWidth)
       }
 
@@ -525,7 +528,8 @@ export default function PDFGenerator({ formData, onClose }) {
         yPos = drawField(pdf, 'Type', fr.type, margin, yPos, pageWidth)
         if (fr.incision) yPos = drawField(pdf, 'Incision', 'Oui', margin, yPos, pageWidth)
         if (fr.desinsertionFibres) yPos = drawField(pdf, 'Désinsertion', 'Oui', margin, yPos, pageWidth)
-        yPos = drawField(pdf, 'Sutures', [fr.sutures, fr.fil, fr.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
+        const frSuturesText = Array.isArray(fr.sutures) && fr.sutures.length > 0 ? fr.sutures.join(', ') : fr.sutures
+        yPos = drawField(pdf, 'Sutures', [frSuturesText, fr.fil, fr.typeFil].filter(Boolean).join(' • '), margin, yPos, pageWidth)
         yPos = drawField(pdf, 'Hémostase', fr.hemostase, margin, yPos, pageWidth)
       }
 

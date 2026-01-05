@@ -95,7 +95,7 @@ const getInitialFormData = (urlParams) => {
       hauteurOsResiduel: '',
       poseCle: '',
       vis: '',
-      sutures: '',
+      sutures: [],
       fil: '',
       typeFil: '',
       hemostase: ''
@@ -111,7 +111,7 @@ const getInitialFormData = (urlParams) => {
       revisionPlaie: false,
       nettoyageCHX: false,
       biomateriaux: [],
-      sutures: '',
+      sutures: [],
       fil: '',
       typeFil: '',
       hemostase: ''
@@ -129,7 +129,7 @@ const getInitialFormData = (urlParams) => {
       separationRacines: '',
       revisionPlaie: false,
       rincageCHX: false,
-      sutures: '',
+      sutures: [],
       fil: '',
       typeFil: '',
       hemostase: ''
@@ -151,7 +151,7 @@ const getInitialFormData = (urlParams) => {
       incision: false,
       desinsertionFibres: false,
       suturesCheck: false,
-      sutures: '',
+      sutures: [],
       fil: '',
       typeFil: '',
       hemostase: ''
