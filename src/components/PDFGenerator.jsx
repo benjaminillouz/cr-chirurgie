@@ -694,7 +694,7 @@ export default function PDFGenerator({ formData, onClose }) {
 
   // Gmail OAuth configuration
   const GMAIL_CLIENT_ID = '77466324556-s2siqrgbdj9qt0hu45s9oqsa4n5650in.apps.googleusercontent.com'
-  const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.send'
+  const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.compose'
 
   const [gmailLoading, setGmailLoading] = useState(false)
   const [gmailError, setGmailError] = useState(null)
