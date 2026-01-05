@@ -826,12 +826,13 @@ export default function PDFGenerator({ formData, onClose }) {
           }
 
           try {
-            await sendGmailWithAttachment(tokenResponse.access_token)
+            const draftId = await createGmailDraft(tokenResponse.access_token)
             setGmailLoading(false)
-            alert('Email envoyé avec succès !')
+            // Open Gmail with the draft ready to send
+            window.open(`https://mail.google.com/mail/u/0/#drafts?compose=${draftId}`, '_blank')
           } catch (err) {
-            console.error('Gmail send error:', err)
-            setGmailError('Erreur lors de l\'envoi: ' + err.message)
+            console.error('Gmail draft error:', err)
+            setGmailError('Erreur lors de la création: ' + err.message)
             setGmailLoading(false)
           }
         }
@@ -845,7 +846,7 @@ export default function PDFGenerator({ formData, onClose }) {
     }
   }
 
-  const sendGmailWithAttachment = async (accessToken) => {
+  const createGmailDraft = async (accessToken) => {
     const patientEmail = gmailRecipient || formData.patientMail || ''
 
     if (!patientEmail) {
@@ -890,14 +891,14 @@ export default function PDFGenerator({ formData, onClose }) {
       .replace(/\//g, '_')
       .replace(/=+$/, '')
 
-    // Send via Gmail API
-    const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    // Create draft via Gmail API
+    const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ raw: encodedMessage })
+      body: JSON.stringify({ message: { raw: encodedMessage } })
     })
 
     if (!response.ok) {
@@ -905,7 +906,8 @@ export default function PDFGenerator({ formData, onClose }) {
       throw new Error(error.error?.message || 'Erreur Gmail API')
     }
 
-    return response.json()
+    const data = await response.json()
+    return data.message.id
   }
 
   const shareNative = async () => {
@@ -1051,8 +1053,8 @@ export default function PDFGenerator({ formData, onClose }) {
                     )}
                   </div>
                   <div className="flex-1 text-left">
-                    <span className="text-red-700 font-medium block">Envoyer via Gmail</span>
-                    <span className="text-red-500 text-xs">Avec pièce jointe PDF</span>
+                    <span className="text-red-700 font-medium block">Préparer dans Gmail</span>
+                    <span className="text-red-500 text-xs">Ouvre un brouillon avec la pièce jointe</span>
                   </div>
                 </button>
 
@@ -1063,7 +1065,7 @@ export default function PDFGenerator({ formData, onClose }) {
                     <ol className="list-decimal list-inside space-y-1 text-amber-700">
                       <li>Cliquez sur <strong>"Paramètres avancés"</strong></li>
                       <li>Puis sur <strong>"Accéder à cemedis.app (non sécurisé)"</strong></li>
-                      <li>Autorisez l'envoi d'emails</li>
+                      <li>Autorisez la création de brouillons</li>
                     </ol>
                   </div>
                 )}
