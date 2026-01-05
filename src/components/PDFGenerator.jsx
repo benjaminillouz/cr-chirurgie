@@ -826,10 +826,11 @@ export default function PDFGenerator({ formData, onClose }) {
           }
 
           try {
-            const draftId = await createGmailDraft(tokenResponse.access_token)
+            await createGmailDraft(tokenResponse.access_token)
             setGmailLoading(false)
-            // Open Gmail with the draft ready to send
-            window.open(`https://mail.google.com/mail/u/0/#drafts?compose=${draftId}`, '_blank')
+            // Open Gmail drafts folder
+            window.open('https://mail.google.com/mail/u/0/#drafts', '_blank')
+            alert('Brouillon créé ! Ouvrez-le dans Gmail pour l\'envoyer.')
           } catch (err) {
             console.error('Gmail draft error:', err)
             setGmailError('Erreur lors de la création: ' + err.message)
