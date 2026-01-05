@@ -1,4 +1,4 @@
-import { FormSection, RadioGroup, TextInput, Select, TeethSelector } from '../../ui'
+import { FormSection, RadioGroup, TextInput, Select, TeethSelector, CheckboxGroup } from '../../ui'
 
 const INDICATION_OPTIONS = [
   "Dent(s) mécaniquement(s) non conservable(s)",
@@ -103,11 +103,10 @@ export default function ImplantologieForm({ data, updateData }) {
       </FormSection>
 
       <FormSection title="Sutures">
-        <RadioGroup
-          name="implanto-sutures"
+        <CheckboxGroup
           options={SUTURES_OPTIONS}
-          value={data.sutures}
-          onChange={(value) => updateData('sutures', value)}
+          values={data.sutures}
+          onChange={(values) => updateData('sutures', values)}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

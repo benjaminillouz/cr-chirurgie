@@ -3,6 +3,7 @@ import { FormSection, CheckboxGroup, Select } from '../ui'
 const PREMEDICATION_OPTIONS = [
   'Anti Inflammatoires',
   'Antalgiques',
+  'Antibiotiques',
   'Antiseptiques locaux',
   'Sédation'
 ]
