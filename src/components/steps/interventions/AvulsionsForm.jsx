@@ -3,7 +3,8 @@ import { FormSection, RadioGroup, TextInput, CheckboxGroup, TeethSelector } from
 const INDICATION_OPTIONS = [
   "Dent(s) mécaniquement(s) non conservable(s)",
   "Elimination foyers infectieux",
-  "Indications Orthodontiques"
+  "Indications Orthodontiques",
+  "Dents de sagesse"
 ]
 
 const OUI_NON = ['Oui', 'Non']
